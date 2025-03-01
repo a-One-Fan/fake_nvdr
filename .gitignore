@@ -1,0 +1,2 @@
+/test/out/*
+!/test/out/.empty_folder
