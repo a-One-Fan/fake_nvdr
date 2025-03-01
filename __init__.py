@@ -200,50 +200,62 @@ class fake_NVDR_top:
     __path__ = []
     torch = fake_NVDR
 
-#class torch_scatter:
-#
-#    @staticmethod
-#    def scatter_max(src, index, dim, out = None):
-#        #print("Scatter max:")
-#        #print(dim)
-#        #print(src.size())
-#        #max = 0
-#        #for i in range(index.size()[0]):
-#        #    if index[i] > max:
-#        #        max = index[i]
-#        #print(f"Max: {max}")
-#        #print(index.size())
-#        out = torch.scatter(src, dim, index, src)
-#        return out
-#
-#    @staticmethod
-#    def scatter_add(src, index, dim, out = None):
-#        #print("Scatter add:")
-#        #print(dim)
-#        #print(src.size())
-#        #max = 0
-#        #for i in range(index.size()[0]):
-#        #    if index[i] > max:
-#        #        max = index[i]
-#        #print(f"Max: {max}")
-#        #print(index.size())
-#        out = torch.scatter_add(src, dim, index, src)
-#        return out
-#    
-#    @staticmethod
-#    def scatter_mean(src, index, dim, out = None):
-#        #print("Scatter mean:")
-#        #print(dim)
-#        #print(src.size())
-#        #max = 0
-#        #for i in range(index.size()[0]):
-#        #    if index[i] > max:
-#        #        max = index[i]
-#        #print(f"Max: {max}")
-#        #print(index.size())
-#
-#        out = torch.scatter_reduce(src.to('cpu'), dim, index.to('cpu'), src.to('cpu'), reduce="mean", include_self=False)
-#        return out.to(src.device)
+import torch_scatter as ts
+
+class torch_scatter:
+
+    @staticmethod
+    def scatter_max(src, index, dim, out = None):
+        #print("Scatter max:")
+        #print(dim)
+        #print(src.size())
+        #max = 0
+        #for i in range(index.size()[0]):
+        #    if index[i] > max:
+        #        max = index[i]
+        #print(f"Max: {max}")
+        #print(index.size())
+        #res = torch.scatter(src, dim, index, src)
+        res, resmax = ts.scatter_max(src.to('cpu'), index.to('cpu'), dim)
+        print("tested")
+        if out != None:
+            out.copy_(res.to(src.device))
+        return (res.to(src.device), resmax.to(src.device))
+
+    @staticmethod
+    def scatter_add(src, index, dim, out = None):
+        #print("Scatter add:")
+        #print(dim)
+        #print(src.size())
+        #max = 0
+        #for i in range(index.size()[0]):
+        #    if index[i] > max:
+        #        max = index[i]
+        #print(f"Max: {max}")
+        #print(index.size())
+        #res = torch.scatter_add(src, dim, index, src)
+        res = ts.scatter_add(src.to('cpu'), index.to('cpu'), dim)
+        if out != None:
+            out.copy_(res.to(src.device))
+        return res.to(src.device)
+    
+    @staticmethod
+    def scatter_mean(src, index, dim, out = None):
+        #print("Scatter mean:")
+        #print(dim)
+        #print(src.size())
+        #max = 0
+        #for i in range(index.size()[0]):
+        #    if index[i] > max:
+        #        max = index[i]
+        #print(f"Max: {max}")
+        #print(index.size())
+
+        #res = torch.scatter_reduce(src.to('cpu'), dim, index.to('cpu'), src.to('cpu'), reduce="mean", include_self=False)
+        res = ts.scatter_mean(src.to('cpu'), index.to('cpu'), dim)
+        if out != None:
+            out.copy_(res.to(src.device))
+        return res.to(src.device)
 
 def loadobj(filepath, paduv=0.0, padw=1):
     re_vertex = re.compile(r"v ([\-\.0-9]+) ([\-\.0-9]+) ([\-\.0-9]+)")
@@ -284,7 +296,18 @@ def loadobj(filepath, paduv=0.0, padw=1):
 print("Patching NVDR.")
 sys.modules["nvdiffrast"] = fake_NVDR_top
 sys.modules["nvdiffrast.torch"] = fake_NVDR
-#sys.modules["torch_scatter"] = torch_scatter
+sys.modules["torch_scatter"] = torch_scatter
+
+def id_decorator(*args, **kwargs):
+    def inner0(f):
+        def inner1(*args, **kwargs):
+            return f(*args, **kwargs)
+        return inner1
+    return inner0
+
+if(torch.__version__ < "2.5"):
+    torch.amp.custom_fwd = id_decorator
+    torch.amp.custom_bwd = id_decorator
 
 def __test_scatter():
     import torch_scatter
@@ -315,6 +338,15 @@ if __name__ == "__main__":
     from torchvision.utils import save_image
     from torchvision.io import read_image, ImageReadMode
     import nvdiffrast.torch as dr
+
+    from torch.amp import custom_fwd, custom_bwd
+
+    @custom_fwd(cast_inputs=torch.float32, device_type="cuda")
+    def decorator_test(val):
+        print(f"Decorator test: {val}")
+
+
+    decorator_test(111)
 
     #__test_scatter()
     
