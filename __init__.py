@@ -4,7 +4,9 @@ import torch
 import sys
 import os
 import re
-import pdb
+#import faulthandler
+
+#faulthandler.enable()
 
 class OpenCLContext:
     ctx: cl._cl.Context
@@ -208,91 +210,40 @@ def safecopy(te):
         return te
     return te.cpu().detach().clone()
 
-def test_te_eq(te1, te2):
-    if te1 == None:
-        if te2 == None:
-            print(f"Equal (None)")
-            return True
-        print(f"te1 = None, te2 = {te2}")
-        return False
-    if te2 == None:
-        print(f"te1 = {te1}, te2 = None")
-        return False
-    if te1.size() != te2.size():
-        print(f"te1 and te2 size mismatch: {te1.size()} != {te2.size()}")
-        return False
-    if not torch.allclose(te1, te2):
-        print(f"te1 and te2 are not equal: {te1} {te2}")
-        return False
-    
-    print("Equal")
-    return True
-
 class torch_scatter:
 
     @staticmethod
     def scatter_max(src, index, dim, out = None, dim_size = None):
-        res_out = safecopy(out)
-        out_expected = safecopy(out)
 
-        res = torch.scatter(src.to('cpu'), dim, index.to('cpu'), src.to('cpu'), out=res_out)
-        res_argmax = torch.argmax(src.to('cpu'), dim)
-
-        res_expected, res_argmax_expected = ts.scatter_max(src.to('cpu'), index.to('cpu'), dim, out_expected, dim_size)
-
-        maxi = torch.max(index).item()
-        print(f"Scatter_max: {src.size()} {index.size()} {maxi}  dim={dim}")
-        print("Test out:")
-        if not test_te_eq(res_out, out_expected): pdb.set_trace()
-        print("Test res:")
-        if not test_te_eq(res, res_expected): pdb.set_trace()
-        print("Test argmax:")
-        if not test_te_eq(res_argmax, res_argmax_expected): pdb.set_trace()
+        newout = safecopy(out)
+        res, argmax = ts.scatter_max(src.to('cpu'), index.to('cpu'), dim, newout, dim_size)
 
         if out != None:
-            out.copy_(out_expected)
+            out.copy_(newout.to(src.device))
               
-        return (res.to(src.device), res_argmax_expected.to(src.device))
+        return (res.to(src.device), argmax.to(src.device))
 
     @staticmethod
     def scatter_add(src, index, dim, out = None, dim_size = None):
-        res_out = safecopy(out)
-        out_expected = safecopy(out)
 
-        res = torch.scatter_reduce(src.to('cpu'), dim, index.to('cpu'), src.to('cpu'), reduce="sum", include_self=False, out=res_out).split((maxi+1, src.size()[dim]-maxi-1), dim)[0]
-        res_expected = ts.scatter_add(src.to('cpu'), index.to('cpu'), dim, out_expected, dim_size)
+        newout = safecopy(out)
+        res = ts.scatter_add(src.to('cpu'), index.to('cpu'), dim, newout, dim_size)
         
-        maxi = torch.max(index).item()
-        print(f"Scatter_add: {src.size()} {index.size()} {maxi}  dim={dim}")
-        print("Test out:")
-        if not test_te_eq(res_out, out_expected): pdb.set_trace()
-        print("Test res:")
-        if not test_te_eq(res, res_expected): pdb.set_trace()
-
         if out != None:
-            out.copy_(out_expected)
+            out.copy_(newout.to(src.device))
 
         return res.to(src.device)
     
     @staticmethod
     def scatter_mean(src, index, dim=-1, out = None, dim_size = None):
-        res_out = safecopy(out)
-        out_expected = safecopy(out)
-
-        maxi = torch.max(index).item()
-        res = torch.scatter_reduce(src.to('cpu'), dim, index.to('cpu'), src.to('cpu'), reduce="mean", include_self=False, out=res_out).split((maxi+1, src.size()[dim]-maxi-1), dim)[0]
-        res_expected = ts.scatter_mean(src.to('cpu'), index.to('cpu'), dim, out_expected, dim_size)
-
-        print(f"Scatter_mean: {src.size()} {index.size()} {maxi}  dim={dim}")
-        print("Test out:")
-        if not test_te_eq(res_out, out_expected): pdb.set_trace()
-        print("Test res:")
-        if not test_te_eq(res, res_expected): pdb.set_trace()
-
+        
+        newout = safecopy(out)
+        res = ts.scatter_mean(src.to('cpu'), index.to('cpu'), dim, newout, dim_size)
+        
         if out != None:
-            out.copy_(out_expected)
+            out.copy_(newout.to(src.device))
 
-        return res_expected.to(src.device)
+        return res.to(src.device)
 
 def loadobj(filepath, paduv=0.0, padw=1):
     re_vertex = re.compile(r"v ([\-\.0-9]+) ([\-\.0-9]+) ([\-\.0-9]+)")
