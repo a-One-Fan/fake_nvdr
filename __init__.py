@@ -322,6 +322,8 @@ def __test_scatter():
         print("=/")
         print(argmax_target)
 
+NODE_CLASS_MAPPINGS = {}
+
 if __name__ == "__main__":
     from torchvision.utils import save_image
     from torchvision.io import read_image, ImageReadMode
@@ -333,10 +335,9 @@ if __name__ == "__main__":
     def decorator_test(val):
         print(f"Decorator test: {val}")
 
-
     decorator_test(111)
 
-    #__test_scatter()
+    __test_scatter()
     
     def maprange(val, oldmin, oldmax, newmin, newmax):
         fac = (val - oldmin)/(oldmax - oldmin)
